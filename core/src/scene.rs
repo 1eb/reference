@@ -1,19 +1,105 @@
+struct Vec3(f32, f32, f32);
+
+struct Vec4(f32, f32, f32, f32);
+
+struct Mat3(Vec3, Vec3, Vec3);
+
+struct Mat4(Vec4, Vec4, Vec4, Vec4);
+
+impl From<Vec4> for Vec3 {
+    fn from(vec: Vec4) -> Self {
+        Vec3(vec.0, vec.1, vec.2)
+    }
+}
+
+impl std::ops::Add<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn add(self, rhs: Vec3) -> Vec3 {
+        Vec3(self.0 + rhs.0, self.1 + rhs.1, self.2 + rhs.2)
+    }
+}
+
+impl std::ops::Sub<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn sub(self, rhs: Vec3) -> Vec3 {
+        Vec3(self.0 / rhs.0, self.1 / rhs.1, self.2 / rhs.2)
+    }
+}
+
+impl std::ops::Mul<f32> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: f32) -> Vec3 {
+        Vec3(self.0 * rhs, self.1 * rhs, self.2 * rhs)
+    }
+}
+
+impl std::ops::Mul<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Vec3) -> Vec3 {
+        Vec3(self.0 * rhs.0, self.1 * rhs.1, self.2 * rhs.2)
+    }
+}
+
+impl std::ops::Div<f32> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, rhs: f32) -> Vec3 {
+        Vec3(self.0 / rhs, self.1 / rhs, self.2 / rhs)
+    }
+}
+
+impl std::ops::Div<Vec3> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, rhs: Vec3) -> Vec3 {
+        Vec3(self.0 / rhs.0, self.1 / rhs.1, self.2 / rhs.2)
+    }
+}
+
+impl Vec3 {
+    fn dot(self, rhs: Vec3) -> f32 {
+        self.0 * rhs.0 + self.1 * rhs.1 + self.2 * rhs.2
+    }
+
+    fn cross(self, rhs: Vec3) -> Vec3 {
+        Vec3(
+            self.1 * rhs.2 - self.2 * rhs.1,
+            self.2 * rhs.0 - self.0 * rhs.2,
+            self.0 * rhs.1 - self.1 * rhs.0,
+        )
+    }
+
+    fn length_squared(self) -> f32 {
+        self.0 * self.0 + self.1 * self.1 + self.2 * self.2
+    }
+
+    fn length(self) -> f32 {
+        self.length_squared().sqrt()
+    }
+
+    fn normalize(self) -> Vec3 {
+        self / self.length()
+    }
+}
+
+impl Vec4 {
+    //
+}
+
 pub struct Position {
-    x: f32,
-    y: f32,
-    z: f32,
+    vec: Vec3,
 }
 
 pub struct Movement {
-    x: f32,
-    y: f32,
-    z: f32,
+    vec: Vec3,
 }
 
 pub struct Direction {
-    x: f32,
-    y: f32,
-    z: f32,
+    vec: Vec3,
 }
 
 pub struct LdrColor {
@@ -29,41 +115,33 @@ pub struct HdrColor {
 }
 
 pub struct Transform {
-    mat: (
-        (f32, f32, f32, f32),
-        (f32, f32, f32, f32),
-        (f32, f32, f32, f32),
-        (f32, f32, f32, f32),
-    ),
+    mat: Mat4,
 }
 
 impl Position {
     pub fn new(x: f32, y: f32, z: f32) -> Position {
-        Position { x, y, z }
+        Position { vec: Vec3(x, y, z) }
     }
 }
 
 impl Movement {
     pub fn new(x: f32, y: f32, z: f32) -> Movement {
-        Movement { x, y, z }
+        Movement { vec: Vec3(x, y, z) }
     }
 
     pub fn distance_squared(&self) -> f32 {
-        self.x * self.x + self.y * self.y + self.z * self.z
+        self.vec.length_squared()
     }
 
     pub fn distance(&self) -> f32 {
-        self.distance_squared().sqrt()
+        self.vec.length()
     }
 }
 
 impl Direction {
     pub fn new(movement: Movement) -> Direction {
-        let length = movement.distance();
         Direction {
-            x: movement.x / length,
-            y: movement.y / length,
-            z: movement.z / length,
+            vec: movement.vec.normalize(),
         }
     }
 }
@@ -110,7 +188,9 @@ impl std::ops::Add<Movement> for Position {
     type Output = Position;
 
     fn add(self, rhs: Movement) -> Position {
-        Position::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+        Position {
+            vec: self.vec + rhs.vec,
+        }
     }
 }
 
@@ -118,7 +198,9 @@ impl std::ops::Sub<Position> for Position {
     type Output = Movement;
 
     fn sub(self, rhs: Position) -> Movement {
-        Movement::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
+        Movement {
+            vec: self.vec - rhs.vec,
+        }
     }
 }
 
@@ -126,15 +208,19 @@ impl std::ops::Mul<f32> for Movement {
     type Output = Movement;
 
     fn mul(self, rhs: f32) -> Self::Output {
-        Movement::new(self.x * rhs, self.y * rhs, self.z * rhs)
+        Movement {
+            vec: self.vec * rhs,
+        }
     }
 }
 
 impl std::ops::Mul<f32> for Direction {
     type Output = Movement;
 
-    fn mul(self, rhs: f32) -> Self::Output {
-        Movement::new(self.x * rhs, self.y * rhs, self.z * rhs)
+    fn mul(self, rhs: f32) -> Movement {
+        Movement {
+            vec: self.vec * rhs,
+        }
     }
 }
 
