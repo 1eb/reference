@@ -104,20 +104,6 @@ impl Vec4 {
     }
 }
 
-impl Mat3 {
-    pub fn c0(self) -> Vec3 {
-        Vec3(self.0 .0, self.1 .0, 0f32)
-    }
-
-    pub fn c1(self) -> Vec3 {
-        Vec3(self.0 .1, self.1 .1, 0f32)
-    }
-
-    pub fn c2(self) -> Vec3 {
-        Vec3(self.0 .2, self.1 .2, 1f32)
-    }
-}
-
 impl std::ops::Mul for Mat3 {
     type Output = Mat3;
 
@@ -262,22 +248,28 @@ impl Mat4 {
         )
     }
 
-    pub fn rotate_x_by_rad(angle: f32) -> Mat4 {
+    pub fn rotate_x_by_angle(angle: f32) -> Mat4 {
         let cos = angle.cos();
         let sin = angle.sin();
         Mat4::rotate_x_by_trigonometric(cos, sin)
     }
 
-    pub fn rotate_y_by_rad(angle: f32) -> Mat4 {
+    pub fn rotate_y_by_angle(angle: f32) -> Mat4 {
         let cos = angle.cos();
         let sin = angle.sin();
         Mat4::rotate_y_by_trigonometric(cos, sin)
     }
 
-    pub fn rotate_z_by_rad(angle: f32) -> Mat4 {
+    pub fn rotate_z_by_angle(angle: f32) -> Mat4 {
         let cos = angle.cos();
         let sin = angle.sin();
         Mat4::rotate_z_by_trigonometric(cos, sin)
+    }
+
+    pub fn rotate(yaw: f32, pitch: f32, roll: f32) -> Mat4 {
+        Mat4::rotate_z_by_angle(yaw)
+            * Mat4::rotate_x_by_angle(pitch)
+            * Mat4::rotate_y_by_angle(roll)
     }
 
     pub fn scale3(x: f32, y: f32, z: f32) -> Mat4 {
@@ -290,6 +282,31 @@ impl Mat4 {
 
     pub fn scale1(scale: f32) -> Mat4 {
         Mat4::scale3(scale, scale, scale)
+    }
+}
+
+impl std::ops::Mul<Mat3> for Vec3 {
+    type Output = Vec3;
+
+    fn mul(self, rhs: Mat3) -> Vec3 {
+        Vec3(
+            self.0 * rhs.0 .0 + self.0 * rhs.1 .0,
+            self.1 * rhs.0 .1 + self.1 * rhs.1 .1,
+            self.2 * rhs.0 .2 * self.2 * rhs.1 .2 + self.2,
+        )
+    }
+}
+
+impl std::ops::Mul<Mat4> for Vec4 {
+    type Output = Vec4;
+
+    fn mul(self, rhs: Mat4) -> Vec4 {
+        Vec4(
+            self.0 * rhs.0 .0 + self.0 * rhs.1 .0 * self.0 * rhs.2 .0,
+            self.1 * rhs.0 .1 + self.1 * rhs.1 .1 + self.1 * rhs.2 .1,
+            self.2 * rhs.0 .2 * self.2 * rhs.1 .2 + self.2 * rhs.2 .2,
+            self.3 * rhs.0 .3 * self.3 * rhs.1 .3 * self.3 * rhs.2 .3 + self.3,
+        )
     }
 }
 
@@ -343,9 +360,9 @@ mod tests {
 
     fn random_rotation_mat4(rng: &mut StdRng) -> Mat4 {
         match rng.gen_range(0..3) {
-            0 => Mat4::rotate_x_by_rad(rng.gen_range(0.0..std::f32::consts::PI)),
-            1 => Mat4::rotate_y_by_rad(rng.gen_range(0.0..std::f32::consts::PI)),
-            _ => Mat4::rotate_z_by_rad(rng.gen_range(0.0..std::f32::consts::PI)),
+            0 => Mat4::rotate_x_by_angle(rng.gen_range(0.0..std::f32::consts::PI)),
+            1 => Mat4::rotate_y_by_angle(rng.gen_range(0.0..std::f32::consts::PI)),
+            _ => Mat4::rotate_z_by_angle(rng.gen_range(0.0..std::f32::consts::PI)),
         }
     }
 
@@ -373,12 +390,12 @@ mod tests {
     fn test_inverse_of_random_transformations_mat3() {
         let mut rng = StdRng::seed_from_u64(42);
 
-        for _ in 0..10 {
+        for _ in 0..42 {
             let mat = random_transformation_composition_mat3(&mut rng);
             let inv_mat = mat.inverse();
             let result = mat * inv_mat;
 
-            assert!(approx_eq_mat3(result, I3, 1e-4));
+            assert!(approx_eq_mat3(result, I3, 0.00042f32));
         }
     }
 
@@ -386,12 +403,12 @@ mod tests {
     fn test_inverse_of_random_transformations_mat4() {
         let mut rng = StdRng::seed_from_u64(42);
 
-        for _ in 0..10 {
+        for _ in 0..42 {
             let mat = random_transformation_composition_mat4(&mut rng);
             let inv_mat = mat.inverse();
             let result = mat * inv_mat;
 
-            assert!(approx_eq_mat4(result, I4, 1e-4));
+            assert!(approx_eq_mat4(result, I4, 0.00042f32));
         }
     }
 

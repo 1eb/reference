@@ -1,29 +1,35 @@
-use crate::math::{Mat3, Mat4, Vec3, Vec4};
+use crate::math::{Mat4, Vec3, Vec4};
 
+#[derive(Clone, Copy)]
 pub struct Position {
     vec: Vec3,
 }
 
+#[derive(Clone, Copy)]
 pub struct Movement {
     vec: Vec3,
 }
 
+#[derive(Clone, Copy)]
 pub struct Direction {
     vec: Vec3,
 }
 
+#[derive(Clone, Copy)]
 pub struct LdrColor {
     r: f32,
     g: f32,
     b: f32,
 }
 
+#[derive(Clone, Copy)]
 pub struct HdrColor {
     r: f32,
     g: f32,
     b: f32,
 }
 
+#[derive(Clone, Copy)]
 pub struct Transform {
     mat: Mat4,
 }
@@ -52,6 +58,84 @@ impl Direction {
     pub fn new(movement: Movement) -> Direction {
         Direction {
             vec: movement.vec.normalize(),
+        }
+    }
+
+    pub fn angle_between(&self, rhs: &Direction) -> f32 {
+        self.vec.dot(rhs.vec)
+    }
+
+    pub fn perpendicular_to(&self, rhs: &Direction) -> Direction {
+        Direction {
+            vec: self.vec.cross(rhs.vec),
+        }
+    }
+}
+
+impl Transform {
+    pub fn inverse(self) -> Transform {
+        Transform {
+            mat: self.mat.inverse(),
+        }
+    }
+
+    pub fn translate(x: f32, y: f32, z: f32) -> Transform {
+        Transform {
+            mat: Mat4::translate(x, y, z),
+        }
+    }
+
+    pub fn rotate_x_by_trigonometric(cos: f32, sin: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate_x_by_trigonometric(cos, sin),
+        }
+    }
+
+    pub fn rotate_y_by_trigonometric(cos: f32, sin: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate_y_by_trigonometric(cos, sin),
+        }
+    }
+
+    pub fn rotate_z_by_trigonometric(cos: f32, sin: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate_z_by_trigonometric(cos, sin),
+        }
+    }
+
+    pub fn rotate_x_by_angle(angle: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate_x_by_angle(angle),
+        }
+    }
+
+    pub fn rotate_y_by_angle(angle: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate_y_by_angle(angle),
+        }
+    }
+
+    pub fn rotate_z_by_angle(angle: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate_z_by_angle(angle),
+        }
+    }
+
+    pub fn rotate(yaw: f32, pitch: f32, roll: f32) -> Transform {
+        Transform {
+            mat: Mat4::rotate(yaw, pitch, roll),
+        }
+    }
+
+    pub fn scale3(x: f32, y: f32, z: f32) -> Transform {
+        Transform {
+            mat: Mat4::scale3(x, y, z),
+        }
+    }
+
+    pub fn scale1(scale: f32) -> Transform {
+        Transform {
+            mat: Mat4::scale1(scale),
         }
     }
 }
@@ -114,12 +198,30 @@ impl std::ops::Sub<Position> for Position {
     }
 }
 
+impl Position {
+    fn apply(self, transform: Transform) -> Position {
+        Position {
+            vec: (Vec4::from_movement(self.vec) * transform.mat).into(),
+        }
+    }
+}
+
 impl std::ops::Mul<f32> for Movement {
     type Output = Movement;
 
     fn mul(self, rhs: f32) -> Self::Output {
         Movement {
             vec: self.vec * rhs,
+        }
+    }
+}
+
+impl std::ops::Mul<Transform> for Movement {
+    type Output = Movement;
+
+    fn mul(self, rhs: Transform) -> Self::Output {
+        Movement {
+            vec: (Vec4::from_movement(self.vec) * rhs.mat).into(),
         }
     }
 }
@@ -173,21 +275,18 @@ impl std::ops::Add<HdrColor> for HdrColor {
 }
 
 pub struct Scene {
-    camera: AnyCamera,
+    camera: Box<dyn Camera>,
+    world: Box<dyn Object>,
+    lights: Vec<Box<dyn Light>>,
 }
 
 pub trait Camera {
-    fn get_ray(position_in_image: (f32, f32)) -> Ray;
+    fn get_ray(&self, position_in_image: (f32, f32)) -> Ray;
 }
 
 pub struct Ray {
     origin: Position,
     direction: Direction,
-}
-
-pub enum AnyCamera {
-    Orthogonal(OrthogonalCamera),
-    Perspective(PerspectiveCamera),
 }
 
 pub struct OrthogonalCamera {
@@ -197,8 +296,147 @@ pub struct OrthogonalCamera {
     transform: Transform,
 }
 
+impl OrthogonalCamera {
+    fn by_width(
+        position: Position,
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+        aspect_ratio: f32,
+        width: f32,
+    ) -> OrthogonalCamera {
+        let transform = Transform {
+            mat: Mat4::rotate(yaw, pitch, roll),
+        };
+        let original_direction = Direction {
+            vec: Vec3(0f32, 1f32, 0f32),
+        };
+        let direction = Direction {
+            vec: (Vec4::from_movement(original_direction.vec) * transform.mat).into(),
+        };
+
+        OrthogonalCamera {
+            position,
+            direction,
+            size: (width, width / aspect_ratio),
+            transform,
+        }
+    }
+
+    fn by_height(
+        position: Position,
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+        aspect_ratio: f32,
+        height: f32,
+    ) -> OrthogonalCamera {
+        let transform = Transform {
+            mat: Mat4::rotate(yaw, pitch, roll),
+        };
+        let original_direction = Direction {
+            vec: Vec3(0f32, 1f32, 0f32),
+        };
+        let direction = Direction {
+            vec: (Vec4::from_movement(original_direction.vec) * transform.mat).into(),
+        };
+
+        OrthogonalCamera {
+            position,
+            direction,
+            size: (height * aspect_ratio, height),
+            transform,
+        }
+    }
+}
+
+impl Camera for OrthogonalCamera {
+    fn get_ray(&self, position_in_image: (f32, f32)) -> Ray {
+        let offset = Movement::new(
+            self.size.0 * (position_in_image.0 * 2f32 - 1f32),
+            0f32,
+            self.size.1 * (position_in_image.1 * 2f32 - 1f32),
+        );
+        let rotated = offset * self.transform;
+        let origin = self.position + rotated;
+        Ray {
+            origin,
+            direction: self.direction,
+        }
+    }
+}
+
 pub struct PerspectiveCamera {
     position: Position,
-    direction: Direction,
+    transform: Transform,
     tan_fov: (f32, f32),
+}
+
+impl PerspectiveCamera {
+    fn by_x(
+        position: Position,
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+        aspect_ratio: f32,
+        fov_x: f32,
+    ) -> PerspectiveCamera {
+        let tan_fov_x = fov_x.tan();
+        PerspectiveCamera {
+            position,
+            transform: Transform::rotate(yaw, pitch, roll),
+            tan_fov: (tan_fov_x, tan_fov_x / aspect_ratio),
+        }
+    }
+
+    fn by_y(
+        position: Position,
+        yaw: f32,
+        pitch: f32,
+        roll: f32,
+        aspect_ratio: f32,
+        fov_y: f32,
+    ) -> PerspectiveCamera {
+        let tan_fov_y = fov_y.tan();
+        PerspectiveCamera {
+            position,
+            transform: Transform::rotate(yaw, pitch, roll),
+            tan_fov: (tan_fov_y * aspect_ratio, tan_fov_y),
+        }
+    }
+}
+
+impl Camera for PerspectiveCamera {
+    fn get_ray(&self, position_in_image: (f32, f32)) -> Ray {
+        let direction = Direction::new(
+            Movement::new(
+                self.tan_fov.0 * (position_in_image.0 * 2f32 - 1f32),
+                1f32,
+                self.tan_fov.1 * (position_in_image.1 * 2f32 - 1f32),
+            ) * self.transform,
+        );
+        return Ray {
+            origin: self.position,
+            direction,
+        };
+    }
+}
+
+pub trait Object {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection>;
+}
+
+pub struct Intersection {
+    position: Position,
+    real_normal: Direction,
+    adjusted_normal: Direction,
+    material: fn() -> Material,
+}
+
+pub struct Material {
+    brdf: fn(viewer: Direction, light: Direction, normal: Direction) -> LdrColor,
+}
+
+pub trait Light {
+    fn illuminate(self, adjusted_position: Position, world: &dyn Object) -> HdrColor;
 }
