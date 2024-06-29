@@ -5,9 +5,6 @@ pub struct Vec3(pub f32, pub f32, pub f32);
 pub struct Vec4(pub f32, pub f32, pub f32, pub f32);
 
 #[derive(Clone, Copy)]
-pub struct Mat3(pub Vec3, pub Vec3);
-
-#[derive(Clone, Copy)]
 pub struct Mat4(pub Vec4, pub Vec4, pub Vec4);
 
 impl From<Vec4> for Vec3 {
@@ -101,61 +98,6 @@ impl Vec4 {
 
     pub fn from_movement(movement: Vec3) -> Vec4 {
         Vec4(movement.0, movement.1, movement.2, 0f32)
-    }
-}
-
-impl std::ops::Mul for Mat3 {
-    type Output = Mat3;
-
-    fn mul(self, rhs: Self) -> Mat3 {
-        Mat3(
-            Vec3(
-                self.0 .0 * rhs.0 .0 + self.0 .1 * rhs.1 .0,
-                self.0 .0 * rhs.0 .1 + self.0 .1 * rhs.1 .1,
-                self.0 .0 * rhs.0 .2 + self.0 .1 * rhs.1 .2 + self.0 .2,
-            ),
-            Vec3(
-                self.1 .0 * rhs.0 .0 + self.1 .1 * rhs.1 .0,
-                self.1 .0 * rhs.0 .1 + self.1 .1 * rhs.1 .1,
-                self.1 .0 * rhs.0 .2 + self.1 .1 * rhs.1 .2 + self.1 .2,
-            ),
-        )
-    }
-}
-
-impl Mat3 {
-    pub fn inverse(self) -> Mat3 {
-        let inv_det = 1.0 / (self.0 .0 * self.1 .1 - self.0 .1 * self.1 .0);
-        Mat3(
-            Vec3(
-                self.1 .1 * inv_det,
-                -self.0 .1 * inv_det,
-                (self.0 .1 * self.1 .2 - self.0 .2 * self.1 .1) * inv_det,
-            ),
-            Vec3(
-                -self.1 .0 * inv_det,
-                self.0 .0 * inv_det,
-                (self.0 .2 * self.1 .0 - self.0 .0 * self.1 .2) * inv_det,
-            ),
-        )
-    }
-
-    pub fn translate(x: f32, y: f32) -> Mat3 {
-        Mat3(Vec3(1f32, 0f32, x), Vec3(0f32, 1f32, y))
-    }
-
-    pub fn rotate_by_trigonometric(cos: f32, sin: f32) -> Mat3 {
-        Mat3(Vec3(cos, sin, 0f32), Vec3(-sin, cos, 0f32))
-    }
-
-    pub fn rotate_by_rad(angle: f32) -> Mat3 {
-        let cos = angle.cos();
-        let sin = angle.sin();
-        Mat3::rotate_by_trigonometric(cos, sin)
-    }
-
-    pub fn scale2(x: f32, y: f32) -> Mat3 {
-        Mat3(Vec3(x, 0f32, 0f32), Vec3(0f32, y, 0f32))
     }
 }
 
@@ -285,18 +227,6 @@ impl Mat4 {
     }
 }
 
-impl std::ops::Mul<Mat3> for Vec3 {
-    type Output = Vec3;
-
-    fn mul(self, rhs: Mat3) -> Vec3 {
-        Vec3(
-            self.0 * rhs.0 .0 + self.0 * rhs.1 .0,
-            self.1 * rhs.0 .1 + self.1 * rhs.1 .1,
-            self.2 * rhs.0 .2 * self.2 * rhs.1 .2 + self.2,
-        )
-    }
-}
-
 impl std::ops::Mul<Mat4> for Vec4 {
     type Output = Vec4;
 
@@ -317,32 +247,6 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
-
-    const I3: Mat3 = Mat3(Vec3(1f32, 0f32, 0f32), Vec3(0f32, 1f32, 0f32));
-
-    fn random_translation_mat3(rng: &mut StdRng) -> Mat3 {
-        Mat3::translate(rng.gen_range(-100.0..100.0), rng.gen_range(-100.0..100.0))
-    }
-
-    fn random_rotation_mat3(rng: &mut StdRng) -> Mat3 {
-        Mat3::rotate_by_rad(rng.gen_range(0.0..std::f32::consts::PI))
-    }
-
-    fn random_scale_mat3(rng: &mut StdRng) -> Mat3 {
-        Mat3::scale2(rng.gen_range(0.5..2.0), rng.gen_range(0.5..2.0))
-    }
-
-    fn random_transformation_mat3(rng: &mut StdRng) -> Mat3 {
-        match rng.gen_range(0..3) {
-            0 => random_translation_mat3(rng),
-            1 => random_rotation_mat3(rng),
-            _ => random_scale_mat3(rng),
-        }
-    }
-
-    fn random_transformation_composition_mat3(rng: &mut StdRng) -> Mat3 {
-        (0..10).fold(I3, |acc, _| acc * random_transformation_mat3(rng))
-    }
 
     const I4: Mat4 = Mat4(
         Vec4(1f32, 0f32, 0f32, 0f32),
@@ -387,19 +291,6 @@ mod tests {
     }
 
     #[test]
-    fn test_inverse_of_random_transformations_mat3() {
-        let mut rng = StdRng::seed_from_u64(42);
-
-        for _ in 0..42 {
-            let mat = random_transformation_composition_mat3(&mut rng);
-            let inv_mat = mat.inverse();
-            let result = mat * inv_mat;
-
-            assert!(approx_eq_mat3(result, I3, 0.00042f32));
-        }
-    }
-
-    #[test]
     fn test_inverse_of_random_transformations_mat4() {
         let mut rng = StdRng::seed_from_u64(42);
 
@@ -410,15 +301,6 @@ mod tests {
 
             assert!(approx_eq_mat4(result, I4, 0.00042f32));
         }
-    }
-
-    fn approx_eq_mat3(a: Mat3, b: Mat3, epsilon: f32) -> bool {
-        true && (a.0 .0 - b.0 .0).abs() < epsilon
-            && (a.0 .1 - b.0 .1).abs() < epsilon
-            && (a.0 .2 - b.0 .2).abs() < epsilon
-            && (a.1 .0 - b.1 .0).abs() < epsilon
-            && (a.1 .1 - b.1 .1).abs() < epsilon
-            && (a.1 .2 - b.1 .2).abs() < epsilon
     }
 
     fn approx_eq_mat4(a: Mat4, b: Mat4, epsilon: f32) -> bool {

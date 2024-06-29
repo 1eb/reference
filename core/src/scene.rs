@@ -1,292 +1,23 @@
-use crate::math::{Mat4, Vec3, Vec4};
-
-#[derive(Clone, Copy)]
-pub struct Position {
-    vec: Vec3,
-}
-
-#[derive(Clone, Copy)]
-pub struct Movement {
-    vec: Vec3,
-}
-
-#[derive(Clone, Copy)]
-pub struct Direction {
-    vec: Vec3,
-}
-
-#[derive(Clone, Copy)]
-pub struct LdrColor {
-    r: f32,
-    g: f32,
-    b: f32,
-}
-
-#[derive(Clone, Copy)]
-pub struct HdrColor {
-    r: f32,
-    g: f32,
-    b: f32,
-}
-
-#[derive(Clone, Copy)]
-pub struct Transform {
-    mat: Mat4,
-}
-
-impl Position {
-    pub fn new(x: f32, y: f32, z: f32) -> Position {
-        Position { vec: Vec3(x, y, z) }
-    }
-}
-
-impl Movement {
-    pub fn new(x: f32, y: f32, z: f32) -> Movement {
-        Movement { vec: Vec3(x, y, z) }
-    }
-
-    pub fn distance_squared(&self) -> f32 {
-        self.vec.length_squared()
-    }
-
-    pub fn distance(&self) -> f32 {
-        self.vec.length()
-    }
-}
-
-impl Direction {
-    pub fn new(movement: Movement) -> Direction {
-        Direction {
-            vec: movement.vec.normalize(),
-        }
-    }
-
-    pub fn angle_between(&self, rhs: &Direction) -> f32 {
-        self.vec.dot(rhs.vec)
-    }
-
-    pub fn perpendicular_to(&self, rhs: &Direction) -> Direction {
-        Direction {
-            vec: self.vec.cross(rhs.vec),
-        }
-    }
-}
-
-impl Transform {
-    pub fn inverse(self) -> Transform {
-        Transform {
-            mat: self.mat.inverse(),
-        }
-    }
-
-    pub fn translate(x: f32, y: f32, z: f32) -> Transform {
-        Transform {
-            mat: Mat4::translate(x, y, z),
-        }
-    }
-
-    pub fn rotate_x_by_trigonometric(cos: f32, sin: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate_x_by_trigonometric(cos, sin),
-        }
-    }
-
-    pub fn rotate_y_by_trigonometric(cos: f32, sin: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate_y_by_trigonometric(cos, sin),
-        }
-    }
-
-    pub fn rotate_z_by_trigonometric(cos: f32, sin: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate_z_by_trigonometric(cos, sin),
-        }
-    }
-
-    pub fn rotate_x_by_angle(angle: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate_x_by_angle(angle),
-        }
-    }
-
-    pub fn rotate_y_by_angle(angle: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate_y_by_angle(angle),
-        }
-    }
-
-    pub fn rotate_z_by_angle(angle: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate_z_by_angle(angle),
-        }
-    }
-
-    pub fn rotate(yaw: f32, pitch: f32, roll: f32) -> Transform {
-        Transform {
-            mat: Mat4::rotate(yaw, pitch, roll),
-        }
-    }
-
-    pub fn scale3(x: f32, y: f32, z: f32) -> Transform {
-        Transform {
-            mat: Mat4::scale3(x, y, z),
-        }
-    }
-
-    pub fn scale1(scale: f32) -> Transform {
-        Transform {
-            mat: Mat4::scale1(scale),
-        }
-    }
-}
-
-impl LdrColor {
-    pub fn new(r: f32, g: f32, b: f32) -> LdrColor {
-        LdrColor {
-            r: LdrColor::in_range(r),
-            g: LdrColor::in_range(g),
-            b: LdrColor::in_range(b),
-        }
-    }
-
-    fn in_range(f: f32) -> f32 {
-        if f < 0f32 {
-            0f32
-        } else if f > 1f32 {
-            1f32
-        } else {
-            f
-        }
-    }
-}
-
-impl HdrColor {
-    pub fn new(r: f32, g: f32, b: f32) -> HdrColor {
-        HdrColor {
-            r: HdrColor::in_range(r),
-            g: HdrColor::in_range(g),
-            b: HdrColor::in_range(b),
-        }
-    }
-
-    fn in_range(f: f32) -> f32 {
-        if f < 0f32 {
-            0f32
-        } else {
-            f
-        }
-    }
-}
-
-impl std::ops::Add<Movement> for Position {
-    type Output = Position;
-
-    fn add(self, rhs: Movement) -> Position {
-        Position {
-            vec: self.vec + rhs.vec,
-        }
-    }
-}
-
-impl std::ops::Sub<Position> for Position {
-    type Output = Movement;
-
-    fn sub(self, rhs: Position) -> Movement {
-        Movement {
-            vec: self.vec - rhs.vec,
-        }
-    }
-}
-
-impl Position {
-    fn apply(self, transform: Transform) -> Position {
-        Position {
-            vec: (Vec4::from_movement(self.vec) * transform.mat).into(),
-        }
-    }
-}
-
-impl std::ops::Mul<f32> for Movement {
-    type Output = Movement;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        Movement {
-            vec: self.vec * rhs,
-        }
-    }
-}
-
-impl std::ops::Mul<Transform> for Movement {
-    type Output = Movement;
-
-    fn mul(self, rhs: Transform) -> Self::Output {
-        Movement {
-            vec: (Vec4::from_movement(self.vec) * rhs.mat).into(),
-        }
-    }
-}
-
-impl std::ops::Mul<f32> for Direction {
-    type Output = Movement;
-
-    fn mul(self, rhs: f32) -> Movement {
-        Movement {
-            vec: self.vec * rhs,
-        }
-    }
-}
-
-impl std::ops::Mul<f32> for LdrColor {
-    type Output = HdrColor;
-
-    fn mul(self, rhs: f32) -> HdrColor {
-        HdrColor::new(self.r * rhs, self.g * rhs, self.b * rhs)
-    }
-}
-
-impl std::ops::Mul<HdrColor> for LdrColor {
-    type Output = HdrColor;
-
-    fn mul(self, rhs: HdrColor) -> HdrColor {
-        HdrColor::new(self.r * rhs.r, self.g * rhs.g, self.b * rhs.b)
-    }
-}
-
-impl From<LdrColor> for HdrColor {
-    fn from(value: LdrColor) -> Self {
-        HdrColor::new(value.r, value.g, value.b)
-    }
-}
-
-impl std::ops::Mul<HdrColor> for HdrColor {
-    type Output = HdrColor;
-
-    fn mul(self, rhs: HdrColor) -> HdrColor {
-        HdrColor::new(self.r * rhs.r, self.g * rhs.g, self.b * rhs.b)
-    }
-}
-
-impl std::ops::Add<HdrColor> for HdrColor {
-    type Output = HdrColor;
-
-    fn add(self, rhs: HdrColor) -> HdrColor {
-        HdrColor::new(self.r + rhs.r, self.g + rhs.g, self.b + rhs.b)
-    }
-}
+use crate::{
+    base_types::{Direction, HdrColor, LdrColor, Movement, Position, Transform},
+    math::{Mat4, Vec3, Vec4},
+};
 
 pub struct Scene {
-    camera: Box<dyn Camera>,
-    world: Box<dyn Object>,
-    lights: Vec<Box<dyn Light>>,
+    pub camera: Box<dyn Camera>,
+    pub world: Box<dyn Object>,
+    pub ambient_light: HdrColor,
+    pub lights: Vec<Box<dyn Light>>,
 }
 
 pub trait Camera {
     fn get_ray(&self, position_in_image: (f32, f32)) -> Ray;
+    fn position(&self) -> Position;
 }
 
 pub struct Ray {
-    origin: Position,
-    direction: Direction,
+    pub origin: Position,
+    pub direction: Direction,
 }
 
 pub struct OrthogonalCamera {
@@ -364,6 +95,10 @@ impl Camera for OrthogonalCamera {
             direction: self.direction,
         }
     }
+
+    fn position(&self) -> Position {
+        self.position
+    }
 }
 
 pub struct PerspectiveCamera {
@@ -408,7 +143,7 @@ impl PerspectiveCamera {
 
 impl Camera for PerspectiveCamera {
     fn get_ray(&self, position_in_image: (f32, f32)) -> Ray {
-        let direction = Direction::new(
+        let direction = Direction::from_movement(
             Movement::new(
                 self.tan_fov.0 * (position_in_image.0 * 2f32 - 1f32),
                 1f32,
@@ -420,6 +155,10 @@ impl Camera for PerspectiveCamera {
             direction,
         };
     }
+
+    fn position(&self) -> Position {
+        self.position
+    }
 }
 
 pub trait Object {
@@ -427,16 +166,27 @@ pub trait Object {
 }
 
 pub struct Intersection {
-    position: Position,
-    real_normal: Direction,
-    adjusted_normal: Direction,
-    material: fn() -> Material,
+    pub position: Position,
+    pub real_normal: Direction,
+    pub adjusted_normal: Direction,
+    pub material: fn() -> Material,
 }
 
 pub struct Material {
-    brdf: fn(viewer: Direction, light: Direction, normal: Direction) -> LdrColor,
+    pub albedo: LdrColor,
+    pub roughness: f32,
+    pub f0: f32,
 }
 
+const F0_NORMAL: f32 = 0.04f32;
+const F0_GOLD: f32 = 0.75f32;
+const F0_SILVER: f32 = 0.97f32;
+const F0_COPPER: f32 = 0.83f32;
+
 pub trait Light {
-    fn illuminate(self, adjusted_position: Position, world: &dyn Object) -> HdrColor;
+    fn illuminate(
+        &self,
+        adjusted_position: Position,
+        world: &dyn Object,
+    ) -> Option<(HdrColor, Direction)>;
 }
