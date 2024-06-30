@@ -165,11 +165,15 @@ pub trait Object {
     fn intersect(&self, ray: &Ray) -> Option<Intersection>;
 }
 
-pub struct Intersection {
+pub struct Intersection<'a> {
     pub position: Position,
     pub real_normal: Direction,
     pub adjusted_normal: Direction,
-    pub material: fn() -> Material,
+    pub material: Box<dyn MaterialWrapper + 'a>,
+}
+
+pub trait MaterialWrapper {
+    fn get_material(&self) -> Material;
 }
 
 pub struct Material {
@@ -189,4 +193,69 @@ pub trait Light {
         adjusted_position: Position,
         world: &dyn Object,
     ) -> Option<(HdrColor, Direction)>;
+}
+
+pub struct Plane {
+    pub transform: Transform,
+    pub coefficient_x0y0z0: f32,
+    pub coefficient_x1y0z0: f32,
+    pub coefficient_x0y1z0: f32,
+    pub coefficient_x0y0z1: f32,
+    pub material: Box<dyn Fn(Position) -> Material>,
+}
+
+impl Object for Plane {
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+        struct PlaneMaterialWrapper<'a> {
+            parent: &'a Plane,
+            position: Position,
+        }
+
+        impl<'a> MaterialWrapper for PlaneMaterialWrapper<'a> {
+            fn get_material(&self) -> Material {
+                (*self.parent.material)(self.position)
+            }
+        }
+
+        let Ray { origin, direction } = *ray;
+        let Position { vec: Vec3(p, q, r) } = origin;
+        let Direction { vec: Vec3(u, v, w) } = direction;
+
+        let mut coefficient_t1 = 0f32;
+        let mut coefficient_t0 = 0f32;
+
+        {
+            coefficient_t0 += self.coefficient_x0y0z0;
+        }
+        {
+            coefficient_t1 += self.coefficient_x1y0z0 * u;
+            coefficient_t0 += self.coefficient_x1y0z0 * p;
+        }
+        {
+            coefficient_t1 += self.coefficient_x0y1z0 * v;
+            coefficient_t0 += self.coefficient_x0y1z0 * q;
+        }
+        {
+            coefficient_t1 += self.coefficient_x0y0z1 * w;
+            coefficient_t0 += self.coefficient_x0y0z1 * r;
+        }
+
+        let t = -coefficient_t0 / coefficient_t1;
+
+        if t < 0f32 {
+            None
+        } else {
+            let position = origin + direction * t;
+
+            Some(Intersection {
+                position,
+                real_normal: Direction::from_movement(Movement::new(0f32, 1f32, 0f32)),
+                adjusted_normal: Direction::from_movement(Movement::new(0f32, 1f32, 0f32)),
+                material: Box::new(PlaneMaterialWrapper {
+                    parent: &self,
+                    position,
+                }),
+            })
+        }
+    }
 }

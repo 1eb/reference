@@ -1,4 +1,4 @@
-use base_types::{Direction, HdrColor};
+use base_types::{Direction, HdrColor, LdrColor};
 use scene::{Intersection, Material, Scene};
 
 mod base_types;
@@ -22,7 +22,7 @@ pub fn render(scene: &Scene, position_in_image: (f32, f32)) -> Option<HdrColor> 
         albedo,
         roughness,
         f0,
-    } = material();
+    } = material.get_material();
     Some(
         scene
             .lights
@@ -46,7 +46,7 @@ pub fn render(scene: &Scene, position_in_image: (f32, f32)) -> Option<HdrColor> 
     )
 }
 
-pub fn brdf(
+fn brdf(
     surface_to_view: Direction,
     surface_to_light: Direction,
     surface_normal: Direction,
@@ -97,4 +97,78 @@ pub fn brdf(
         roughness,
         f0,
     )
+}
+
+pub struct HdrImage {
+    pub width: usize,
+    pub height: usize,
+    pub content: Vec<Option<HdrColor>>,
+}
+
+pub fn render_hdr_image(
+    scene: &Scene,
+    width: usize,
+    height: usize,
+    sqrt_super_sampling_rate: usize,
+) -> HdrImage {
+    let mut content = Vec::new();
+    for y in 0..height {
+        for x in 0..width {
+            for i in 0..sqrt_super_sampling_rate {
+                for j in 0..sqrt_super_sampling_rate {
+                    content.push(render(
+                        scene,
+                        (
+                            (x * sqrt_super_sampling_rate + i) as f32
+                                / (width * sqrt_super_sampling_rate - 1) as f32,
+                            (y * sqrt_super_sampling_rate + j) as f32
+                                / (height * sqrt_super_sampling_rate - 1) as f32,
+                        ),
+                    ))
+                }
+            }
+        }
+    }
+    HdrImage {
+        width,
+        height,
+        content,
+    }
+}
+
+pub struct LdrImage {
+    pub width: usize,
+    pub height: usize,
+    pub content: Vec<LdrColor>,
+}
+
+pub fn render_ldr_image(
+    hdr_image: HdrImage,
+    exposure: f32,
+    gamma: f32,
+    void_color: LdrColor,
+) -> LdrImage {
+    let HdrImage {
+        width,
+        height,
+        content,
+    } = hdr_image;
+
+    LdrImage {
+        width,
+        height,
+        content: content
+            .iter()
+            .map(|&color| {
+                if let Some(HdrColor { r, g, b }) = color {
+                    let r = (r * exposure).exp().powf(1f32 / gamma);
+                    let g = (g * exposure).exp().powf(1f32 / gamma);
+                    let b = (b * exposure).exp().powf(1f32 / gamma);
+                    LdrColor { r, g, b }
+                } else {
+                    void_color
+                }
+            })
+            .collect(),
+    }
 }
