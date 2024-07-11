@@ -82,6 +82,14 @@ impl Direction {
 }
 
 impl Transform {
+    pub const I: Transform = Transform {
+        mat: Mat4(
+            Vec4(1f32, 0f32, 0f32, 0f32),
+            Vec4(0f32, 1f32, 0f32, 0f32),
+            Vec4(0f32, 0f32, 1f32, 0f32),
+        ),
+    };
+
     pub fn inverse(self) -> Transform {
         Transform {
             mat: self.mat.inverse(),
