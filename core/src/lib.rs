@@ -113,7 +113,7 @@ pub fn render_hdr_image(scene: &Scene, width: usize, height: usize) -> HdrImage 
                 scene,
                 (
                     x as f32 / (width - 1) as f32,
-                    y as f32 / (height - 1) as f32,
+                    1.0f32 - y as f32 / (height - 1) as f32,
                 ),
             ))
         }
@@ -187,9 +187,9 @@ pub fn render_ldr_image(
                 .iter()
                 .map(|&color| {
                     if let Some(HdrColor { r, g, b }) = color {
-                        let r = (r * exposure).exp().powf(1f32 / gamma);
-                        let g = (g * exposure).exp().powf(1f32 / gamma);
-                        let b = (b * exposure).exp().powf(1f32 / gamma);
+                        let r = (1f32 - (-r * exposure).exp()).powf(1f32 / gamma);
+                        let g = (1f32 - (-g * exposure).exp()).powf(1f32 / gamma);
+                        let b = (1f32 - (-b * exposure).exp()).powf(1f32 / gamma);
                         LdrColor { r, g, b }
                     } else {
                         void_color

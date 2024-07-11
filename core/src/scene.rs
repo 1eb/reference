@@ -273,6 +273,14 @@ impl Object for Plane {
                 position,
                 real_normal: Direction::from_movement(Movement::new(0f32, 0f32, 1f32)),
                 adjusted_normal: Direction::from_movement(Movement::new(0f32, 0f32, 1f32)),
+                // material: Material {
+                //     albedo: LdrColor::new(
+                //         position.vec.0 - position.vec.0.floor(),
+                //         position.vec.1 - position.vec.1.floor(),
+                //         position.vec.2 - position.vec.2.floor(),
+                //     ),
+                //     ..self.material.clone()
+                // },
                 material: self.material.clone(),
             })
         }

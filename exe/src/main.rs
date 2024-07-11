@@ -40,9 +40,9 @@ fn main() -> Result<(), Error> {
             },
         )),
         HdrColor {
-            r: 10f32,
-            g: 10f32,
-            b: 10f32,
+            r: 1f32,
+            g: 1f32,
+            b: 1f32,
         },
         vec![],
     );
