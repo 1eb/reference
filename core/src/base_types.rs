@@ -216,7 +216,7 @@ impl std::ops::Sub<Position> for Position {
 }
 
 impl Position {
-    fn apply(self, transform: Transform) -> Position {
+    pub fn apply(self, transform: Transform) -> Position {
         Position {
             vec: (Vec4::from_movement(self.vec) * transform.mat).into(),
         }
